@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity"
+    android:background="@drawable/back">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="31dp"
+        android:text="MY LOCATION"
+        android:textColor="@android:color/holo_blue_dark"
+        android:textSize="35dp"
+        android:id="@+id/imhere"/>
+
+    <TextView
+        android:id="@+id/lat"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/imhere"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="14dp"
+        android:text="latitude"
+        android:textColor="@android:color/holo_green_dark"
+        android:textSize="20dp" />
+
+    <TextView
+        android:id="@+id/lon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/lat"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="14dp"
+        android:text="longitute"
+        android:textColor="@android:color/holo_red_dark"
+        android:textSize="20dp" />
+
+    <TextView
+        android:id="@+id/acc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/lon"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="14dp"
+        android:text="accuracy"
+        android:textColor="@android:color/holo_orange_dark"
+        android:textSize="20dp" />
+
+    <TextView
+        android:id="@+id/alt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/acc"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="14dp"
+        android:text="altitude"
+        android:textColor="@android:color/holo_blue_bright"
+        android:textSize="20dp" />
+
+    <TextView
+        android:id="@+id/add"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/alt"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="14dp"
+        android:text="address "
+        android:textColor="@android:color/white"
+        android:textSize="20dp" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="45dp"
+        android:padding="5dp"
+        android:visibility="invisible" />
+
+
+</RelativeLayout>
