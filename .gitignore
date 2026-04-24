@@ -8,3 +8,9 @@
 /build
 /captures
 .externalNativeBuild
+
+# Keystore files — NEVER commit signing keys
+*.jks
+*.keystore
+keystore.properties
+/keystore/

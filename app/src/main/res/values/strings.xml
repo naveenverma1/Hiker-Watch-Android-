@@ -1,3 +1,14 @@
 <resources>
     <string name="app_name">Hiker Watch</string>
+    <string name="title_my_location">MY LOCATION</string>
+    <string name="status_fetching">Fetching your location…</string>
+    <string name="header_coordinates">COORDINATES</string>
+    <string name="header_address">ADDRESS</string>
+    <string name="default_latitude">Latitude: —</string>
+    <string name="default_longitude">Longitude: —</string>
+    <string name="default_altitude">Altitude: —</string>
+    <string name="default_accuracy">Accuracy: —</string>
+    <string name="default_address">Waiting for location…</string>
+    <string name="error_no_address">Could not determine address</string>
+    <string name="error_permission_denied">Location permission is required to use this app</string>
 </resources>

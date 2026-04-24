@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Data extraction rules (Android 12+ / API 31+) for Hiker's Watch.
+   The app stores no personal user data; defaults are safe.
+   See https://developer.android.com/about/versions/12/backup-restore
+-->
+<data-extraction-rules>
+    <cloud-backup>
+    </cloud-backup>
+    <device-transfer>
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Full/Auto Backup rules for Hiker's Watch.
+   The app stores no personal user data, so we allow everything by default.
+   See https://developer.android.com/guide/topics/data/autobackup
+-->
+<full-backup-content>
+</full-backup-content>
