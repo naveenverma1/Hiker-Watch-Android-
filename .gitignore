@@ -18,3 +18,9 @@ keystore.properties
 # Google Cloud service account keys — NEVER commit
 *-service-account.json
 play-service-account.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
