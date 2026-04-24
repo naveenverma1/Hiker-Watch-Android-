@@ -14,3 +14,7 @@
 *.keystore
 keystore.properties
 /keystore/
+
+# Google Cloud service account keys — NEVER commit
+*-service-account.json
+play-service-account.json
