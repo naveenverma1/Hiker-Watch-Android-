@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors stay the same, but text + surfaces invert. -->
+    <color name="colorPrimary">#64B5F6</color>
+    <color name="colorPrimaryDark">#0D47A1</color>
+    <color name="colorAccent">#26A69A</color>
+
+    <!-- Surfaces -->
+    <color name="white">#FF1E1E22</color>
+    <color name="surfaceCard">#E61E1E22</color>      <!-- ~90% dark card over the hero photo -->
+    <color name="scrim">#55000000</color>
+
+    <!-- Text -->
+    <color name="textPrimary">#F2F2F7</color>
+    <color name="textSecondary">#C7C7CC</color>
+    <color name="textOnPrimary">#FFFFFFFF</color>
+
+    <!-- Data colors, brightened for contrast in the dark card -->
+    <color name="dataLatitude">#81C784</color>
+    <color name="dataLongitude">#EF9A9A</color>
+    <color name="dataAltitude">#90CAF9</color>
+    <color name="dataAccuracy">#FFB74D</color>
+
+    <!-- Status / banners -->
+    <color name="warningBackground">#5D4037</color>
+    <color name="warningText">#FFCCBC</color>
+</resources>

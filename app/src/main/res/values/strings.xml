@@ -1,14 +1,55 @@
 <resources>
-    <string name="app_name">Hiker Watch</string>
-    <string name="title_my_location">MY LOCATION</string>
-    <string name="status_fetching">Fetching your location…</string>
+    <!-- App identity -->
+    <string name="app_name">Hiker\'s Watch</string>
+    <string name="app_tagline">Your GPS in your pocket</string>
+
+    <!-- Sections -->
     <string name="header_coordinates">COORDINATES</string>
     <string name="header_address">ADDRESS</string>
+
+    <!-- Status -->
+    <string name="status_fetching">Fetching your location…</string>
+    <string name="status_waiting">Waiting for first fix…</string>
+    <string name="status_approx_only">Approximate location only — turn on \"Precise\" in App info for better accuracy.</string>
+
+    <!-- Coord labels -->
     <string name="default_latitude">Latitude: —</string>
     <string name="default_longitude">Longitude: —</string>
     <string name="default_altitude">Altitude: —</string>
     <string name="default_accuracy">Accuracy: —</string>
     <string name="default_address">Waiting for location…</string>
-    <string name="error_no_address">Could not determine address</string>
-    <string name="error_permission_denied">Location permission is required to use this app</string>
+
+    <!-- Errors -->
+    <string name="error_no_address">Could not determine address.</string>
+    <string name="error_geocoder_unavailable">Address lookup is not available on this device.</string>
+    <string name="error_permission_denied">Location permission is required to use Hiker\'s Watch.</string>
+    <string name="error_permission_blocked">Location permission is blocked. Please enable it in Settings.</string>
+    <string name="error_location_disabled">Location services are off. Please enable them to see your position.</string>
+    <string name="error_no_apps_to_handle">No app on this device can handle that.</string>
+
+    <!-- Actions -->
+    <string name="action_share">Share</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_open_in_maps">Open in Maps</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_open_settings">Open Settings</string>
+    <string name="action_enable_location">Enable</string>
+    <string name="action_privacy">Privacy policy</string>
+    <string name="action_about">About</string>
+
+    <!-- Sharing -->
+    <string name="share_subject">My location</string>
+    <string name="share_chooser_title">Share location via</string>
+    <string name="clipboard_label">Location</string>
+    <string name="clipboard_copied">Location copied to clipboard</string>
+
+    <!-- Footer / About -->
+    <string name="footer_version">Version %1$s (%2$d)</string>
+    <string name="about_title">About Hiker\'s Watch</string>
+    <string name="about_body">A simple, private, on-device GPS display. No accounts, no ads, no trackers.\n\nVersion %1$s (%2$d)</string>
+    <string name="dialog_close">Close</string>
+
+    <!-- Accessibility -->
+    <string name="cd_app_logo">Hiker\'s Watch logo</string>
+    <string name="cd_loading">Loading location</string>
 </resources>

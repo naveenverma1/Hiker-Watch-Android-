@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Brand -->
     <color name="colorPrimary">#1565C0</color>
     <color name="colorPrimaryDark">#0D47A1</color>
     <color name="colorAccent">#00BFA5</color>
-    <color name="white">#FFFFFF</color>
-    <color name="cardBackground">#E0FFFFFF</color>
+
+    <!-- Surfaces -->
+    <color name="white">#FFFFFFFF</color>
+    <color name="surfaceCard">#F2FFFFFF</color>      <!-- 95% white card over the hero photo -->
+    <color name="scrim">#33000000</color>             <!-- Overlay on the hero photo for legibility -->
+
+    <!-- Text -->
+    <color name="textPrimary">#1B1B1F</color>
+    <color name="textSecondary">#4A4A52</color>
+    <color name="textOnPrimary">#FFFFFFFF</color>
+
+    <!-- Data colors (latitude / longitude / altitude / accuracy) -->
+    <color name="dataLatitude">#2E7D32</color>
+    <color name="dataLongitude">#C62828</color>
+    <color name="dataAltitude">#1565C0</color>
+    <color name="dataAccuracy">#E65100</color>
+
+    <!-- Status / banners -->
+    <color name="warningBackground">#FFF3E0</color>
+    <color name="warningText">#BF360C</color>
 </resources>

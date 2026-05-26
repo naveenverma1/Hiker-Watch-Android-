@@ -15,9 +15,15 @@ android {
         applicationId "com.nv.nvgeowatch"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 3
-        versionName "2.1"
+        versionCode 4
+        versionName "2.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Only English strings are shipped — drop default-lib translations to slim the AAB.
+        resourceConfigurations += ["en"]
+
+        // Allow our vector action icons to render on API 21–23 without PNG fallbacks.
+        vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {
@@ -42,6 +48,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     compileOptions {
@@ -53,9 +60,12 @@ android {
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.core:core-splashscreen:1.0.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'com.google.android.gms:play-services-location:21.1.0'
-    implementation 'androidx.cardview:cardview:1.0.0'
+
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
