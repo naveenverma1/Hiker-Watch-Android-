@@ -22,6 +22,8 @@
     <!-- Errors -->
     <string name="error_no_address">Could not determine address.</string>
     <string name="error_geocoder_unavailable">Address lookup is not available on this device.</string>
+    <string name="error_geocoder_timeout">Address lookup timed out. Tap Refresh to try again.</string>
+    <string name="error_permission_first_run">Hiker\'s Watch needs your location to show coordinates and address.</string>
     <string name="error_permission_denied">Location permission is required to use Hiker\'s Watch.</string>
     <string name="error_permission_blocked">Location permission is blocked. Please enable it in Settings.</string>
     <string name="error_location_disabled">Location services are off. Please enable them to see your position.</string>
@@ -32,15 +34,31 @@
     <string name="action_copy">Copy</string>
     <string name="action_open_in_maps">Maps</string>
     <string name="action_retry">Retry</string>
+    <string name="action_grant">Grant</string>
+    <string name="action_refresh">Refresh</string>
     <string name="action_open_settings">Open Settings</string>
     <string name="action_enable_location">Enable</string>
     <string name="action_privacy">Privacy policy</string>
     <string name="action_about">About</string>
+    <string name="action_units">Units &amp; format</string>
+
+    <!-- Settings dialog -->
+    <string name="settings_title">Units &amp; format</string>
+    <string name="settings_altitude_header">Altitude unit</string>
+    <string name="settings_altitude_meters">Meters (m)</string>
+    <string name="settings_altitude_feet">Feet (ft)</string>
+    <string name="settings_coord_header">Coordinate format</string>
+    <string name="settings_coord_decimal">Decimal (12.345678°)</string>
+    <string name="settings_coord_dms">Degrees-min-sec (12° 20\' 44.4\" N)</string>
+    <string name="dialog_save">Save</string>
 
     <!-- Sharing -->
     <string name="share_subject">My location</string>
     <string name="share_chooser_title">Share location via</string>
+    <string name="share_prefix">📍 My current location</string>
     <string name="clipboard_label">Location</string>
+    <string name="clipboard_coords_copied">Coordinates copied</string>
+    <string name="clipboard_address_copied">Address copied</string>
     <string name="clipboard_copied">Location copied to clipboard</string>
 
     <!-- Footer / About -->
@@ -52,4 +70,6 @@
     <!-- Accessibility -->
     <string name="cd_app_logo">Hiker\'s Watch logo</string>
     <string name="cd_loading">Loading location</string>
+    <string name="cd_refresh">Refresh location</string>
+    <string name="cd_tap_to_copy">Tap to copy</string>
 </resources>

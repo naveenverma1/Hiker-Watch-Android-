@@ -6,6 +6,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -51,19 +52,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The single screen of Hiker's Watch.
+ * Hiker's Watch — single-screen GPS display.
  *
- * Responsibilities:
- *   - Request and observe location permission (FINE preferred, COARSE acceptable).
- *   - Stream fused location updates while in the foreground.
- *   - Reverse-geocode the most recent fix and render lat/lon/alt/accuracy + address.
- *   - Expose Share / Copy / Open-in-Maps actions over the current fix.
- *   - Recover gracefully when the user has denied permission permanently, blocked
- *     location services, or only granted approximate location.
+ * Lifecycle
+ *   - onCreate: install splash, inflate view, wire toolbar/actions, ask for permission.
+ *   - onResume: re-evaluate state (permission / GPS / coarse-only), start updates.
+ *   - onPause:  stop location updates and cancel pending tasks.
  *
- * Edge-to-edge: the activity targets Android 15 (API 35) and applies window
- * insets to the toolbar (top) and scroll view (bottom) so content is never
- * drawn under the system bars.
+ * Edge-to-edge for Android 15 (API 35) via setDecorFitsSystemWindows(false) +
+ * inset-aware padding on the app bar and scroll view.
+ *
+ * User preferences (altitude unit, coordinate format) live in SharedPreferences
+ * so they survive process restarts. Defaults: meters + decimal degrees.
  */
 public class MainActivity extends AppCompatActivity {
 
@@ -73,32 +73,44 @@ public class MainActivity extends AppCompatActivity {
     private static final long LOCATION_UPDATE_INTERVAL_MS = 5_000L;
     private static final long LOCATION_FASTEST_INTERVAL_MS = 2_000L;
     /** If we don't have a fix this long after starting, surface a hint to the user. */
-    private static final long FIX_TIMEOUT_MS = 30_000L;
+    private static final long FIX_TIMEOUT_MS    = 30_000L;
+    /** If the geocoder hasn't returned after this long, surface a hint to the user. */
+    private static final long GEOCODE_TIMEOUT_MS = 10_000L;
+
+    // SharedPreferences keys
+    private static final String PREFS = "hiker_prefs";
+    private static final String KEY_HAS_REQUESTED_PERMISSION = "has_requested_permission";
+    private static final String KEY_ALTITUDE_UNIT = "altitude_unit";   // "m" | "ft"
+    private static final String KEY_COORD_FORMAT  = "coord_format";    // "decimal" | "dms"
 
     private ActivityMainBinding binding;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
+    private SharedPreferences prefs;
     private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Nullable private Location lastKnown;
     @Nullable private String   lastAddress;
 
-    private final Runnable fixTimeoutRunnable = this::onFixTimeout;
+    private final Runnable fixTimeoutRunnable     = this::onFixTimeout;
+    private final Runnable geocodeTimeoutRunnable = this::onGeocodeTimeout;
+
+    // -------------------------------------------------------------------------
+    //  Lifecycle
+    // -------------------------------------------------------------------------
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Install the system splash screen BEFORE super.onCreate so the system
-        // can hand off seamlessly from the splash to our content.
         SplashScreen.installSplashScreen(this);
-
         super.onCreate(savedInstanceState);
 
-        // Edge-to-edge for Android 15 (API 35) — required since we target SDK 35.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
+        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
 
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
@@ -109,29 +121,23 @@ public class MainActivity extends AppCompatActivity {
         applyEdgeToEdgeInsets();
         renderVersionFooter();
         wireActionButtons();
+        wireCardTapToCopy();
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
                 Location location = locationResult.getLastLocation();
-                if (location != null) {
-                    onLocationFix(location);
-                }
+                if (location != null) onLocationFix(location);
             }
         };
 
-        // Kick off the permission flow. onResume() will start updates once
-        // permission is granted.
         ensurePermissionAndStart();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // The user may have changed Settings (permission, GPS) while we were
-        // backgrounded — re-evaluate every time we come back to the foreground.
         refreshWarningBanner();
         if (hasAnyLocationPermission() && isLocationEnabled()) {
             startLocationUpdates();
@@ -143,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         stopLocationUpdates();
         mainHandler.removeCallbacks(fixTimeoutRunnable);
+        mainHandler.removeCallbacks(geocodeTimeoutRunnable);
     }
 
     @Override
@@ -152,16 +159,10 @@ public class MainActivity extends AppCompatActivity {
         mainHandler.removeCallbacksAndMessages(null);
     }
 
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     //  Edge-to-edge
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
 
-    /**
-     * Push the system status-bar inset down onto the toolbar's top padding, and
-     * the navigation-bar inset onto the scroll view's bottom padding. Without
-     * this, on Android 15 the toolbar title sits under the status bar and the
-     * version footer sits under the gesture pill.
-     */
     private void applyEdgeToEdgeInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.appBar, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -170,34 +171,33 @@ public class MainActivity extends AppCompatActivity {
         });
         ViewCompat.setOnApplyWindowInsetsListener(binding.scrollView, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            // Top is already handled by the AppBar; only adjust the bottom.
             v.setPadding(v.getPaddingLeft(), v.getPaddingTop(), v.getPaddingRight(), bars.bottom);
             return windowInsets;
         });
     }
 
-    // ---------------------------------------------------------------------
-    //  Permission flow
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    //  Permission flow (with first-run-aware UX)
+    // -------------------------------------------------------------------------
 
     private boolean hasFineLocationPermission() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private boolean hasCoarseLocationPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED;
-    }
-
     private boolean hasAnyLocationPermission() {
-        return hasFineLocationPermission() || hasCoarseLocationPermission();
+        return hasFineLocationPermission()
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private void ensurePermissionAndStart() {
         if (hasAnyLocationPermission()) {
             startLocationUpdates();
         } else {
+            // Mark that we've now requested at least once so onResume distinguishes
+            // "never asked" from "denied permanently" reliably.
+            prefs.edit().putBoolean(KEY_HAS_REQUESTED_PERMISSION, true).apply();
             ActivityCompat.requestPermissions(this,
                     new String[]{
                             Manifest.permission.ACCESS_FINE_LOCATION,
@@ -212,36 +212,32 @@ public class MainActivity extends AppCompatActivity {
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != LOCATION_PERMISSION_REQUEST) return;
-
-        if (hasAnyLocationPermission()) {
-            startLocationUpdates();
-        } else {
-            // If the user *permanently* denied, shouldShowRequestPermissionRationale
-            // returns false for the denied permission — surface a Settings CTA.
-            boolean canAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(
-                    this, Manifest.permission.ACCESS_FINE_LOCATION);
-            if (canAskAgain) {
-                Toast.makeText(this, R.string.error_permission_denied, Toast.LENGTH_LONG).show();
-            }
-        }
+        if (hasAnyLocationPermission()) startLocationUpdates();
         refreshWarningBanner();
     }
-
-    // ---------------------------------------------------------------------
-    //  Location services state
-    // ---------------------------------------------------------------------
 
     private boolean isLocationEnabled() {
         LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         return lm != null && LocationManagerCompat.isLocationEnabled(lm);
     }
 
-    /** Re-evaluate the in-line warning banner each time something might have changed. */
+    /**
+     * Decide which warning banner (if any) to surface based on current state.
+     * Critical: distinguish "never asked" from "permanently denied" via the
+     * {@link #KEY_HAS_REQUESTED_PERMISSION} flag — they look identical from
+     * {@link ActivityCompat#shouldShowRequestPermissionRationale}.
+     */
     private void refreshWarningBanner() {
         if (!hasAnyLocationPermission()) {
+            boolean hasAskedBefore = prefs.getBoolean(KEY_HAS_REQUESTED_PERMISSION, false);
             boolean canAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(
                     this, Manifest.permission.ACCESS_FINE_LOCATION);
-            if (canAskAgain) {
+            if (!hasAskedBefore) {
+                // Truly first run — the system dialog will appear momentarily.
+                // Don't scare the user with "blocked"; show a gentle inline note.
+                showWarning(getString(R.string.error_permission_first_run),
+                        getString(R.string.action_grant), this::ensurePermissionAndStart);
+            } else if (canAskAgain) {
                 showWarning(getString(R.string.error_permission_denied),
                         getString(R.string.action_retry), this::ensurePermissionAndStart);
             } else {
@@ -256,7 +252,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         if (!hasFineLocationPermission()) {
-            // We have coarse only — keep working, but tell the user how to upgrade.
             showWarning(getString(R.string.status_approx_only),
                     getString(R.string.action_open_settings), this::openAppSettings);
             return;
@@ -288,15 +283,13 @@ public class MainActivity extends AppCompatActivity {
         startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
     }
 
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     //  Location updates
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
 
     private void startLocationUpdates() {
         if (!hasAnyLocationPermission() || !isLocationEnabled()) return;
 
-        // If we don't yet have a fix, show the loading row. Once we get a fix
-        // it auto-hides in updateLocationInfo().
         if (lastKnown == null) {
             showLoading(true);
             mainHandler.removeCallbacks(fixTimeoutRunnable);
@@ -315,8 +308,6 @@ public class MainActivity extends AppCompatActivity {
         try {
             fusedLocationClient.requestLocationUpdates(request, locationCallback,
                     Looper.getMainLooper());
-
-            // getLastLocation() returns the cached fix immediately if available.
             fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
                 if (location != null) onLocationFix(location);
             });
@@ -337,20 +328,21 @@ public class MainActivity extends AppCompatActivity {
         showLoading(false);
         mainHandler.removeCallbacks(fixTimeoutRunnable);
 
-        binding.lat.setText(String.format(Locale.US, "Latitude:  %+.6f", location.getLatitude()));
-        binding.lon.setText(String.format(Locale.US, "Longitude: %+.6f", location.getLongitude()));
-        binding.alt.setText(String.format(Locale.US, "Altitude:  %.1f m", location.getAltitude()));
+        binding.lat.setText("Latitude:  " + LocationFormatter.formatLatitude(location.getLatitude(), getCoordFormat()));
+        binding.lon.setText("Longitude: " + LocationFormatter.formatLongitude(location.getLongitude(), getCoordFormat()));
+        binding.alt.setText("Altitude:  " + LocationFormatter.formatAltitude(location.getAltitude(), getAltitudeUnit()));
         binding.acc.setText(String.format(Locale.US, "Accuracy:  %.1f m", location.getAccuracy()));
 
         setActionsEnabled(true);
-
         resolveAddress(location.getLatitude(), location.getLongitude());
     }
 
     private void onFixTimeout() {
-        // We waited FIX_TIMEOUT_MS and still no fix. Surface the warning that's
-        // most likely the cause so the user has a recovery path.
         refreshWarningBanner();
+    }
+
+    private void onGeocodeTimeout() {
+        if (lastAddress == null) binding.address.setText(R.string.error_geocoder_timeout);
     }
 
     private void showLoading(boolean show) {
@@ -363,9 +355,23 @@ public class MainActivity extends AppCompatActivity {
         binding.btnMaps.setEnabled(enabled);
     }
 
-    // ---------------------------------------------------------------------
-    //  Reverse geocoding
-    // ---------------------------------------------------------------------
+    private void refreshNow() {
+        // Re-render with the current fix (picks up new units / format) and re-fetch the geocode.
+        lastAddress = null;
+        if (lastKnown != null) {
+            onLocationFix(lastKnown);
+        }
+        // Force a fresh location pull from the fused client.
+        try {
+            fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
+                if (location != null) onLocationFix(location);
+            });
+        } catch (SecurityException ignore) {}
+    }
+
+    // -------------------------------------------------------------------------
+    //  Reverse geocoding (with timeout)
+    // -------------------------------------------------------------------------
 
     private void resolveAddress(double latitude, double longitude) {
         if (!Geocoder.isPresent()) {
@@ -374,26 +380,26 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        mainHandler.removeCallbacks(geocodeTimeoutRunnable);
+        mainHandler.postDelayed(geocodeTimeoutRunnable, GEOCODE_TIMEOUT_MS);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Async API — required on API 33+ and avoids potential ANRs.
             Geocoder geocoder = new Geocoder(this, Locale.getDefault());
             geocoder.getFromLocation(latitude, longitude, 1, new Geocoder.GeocodeListener() {
-                @Override
-                public void onGeocode(@NonNull List<Address> addresses) {
+                @Override public void onGeocode(@NonNull List<Address> addresses) {
+                    mainHandler.removeCallbacks(geocodeTimeoutRunnable);
                     String text = formatAddress(addresses);
                     lastAddress = text;
                     binding.address.setText(text);
                 }
-
-                @Override
-                public void onError(@Nullable String errorMessage) {
+                @Override public void onError(@Nullable String errorMessage) {
+                    mainHandler.removeCallbacks(geocodeTimeoutRunnable);
                     Log.e(TAG, "Geocoder error: " + errorMessage);
                     lastAddress = null;
                     binding.address.setText(R.string.error_no_address);
                 }
             });
         } else {
-            // Legacy sync API — keep on a background thread.
             backgroundExecutor.execute(() -> {
                 String text;
                 try {
@@ -407,6 +413,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 final String finalText = text;
                 runOnUiThread(() -> {
+                    mainHandler.removeCallbacks(geocodeTimeoutRunnable);
                     lastAddress = finalText;
                     binding.address.setText(finalText);
                 });
@@ -416,9 +423,7 @@ public class MainActivity extends AppCompatActivity {
 
     @NonNull
     private String formatAddress(@Nullable List<Address> addresses) {
-        if (addresses == null || addresses.isEmpty()) {
-            return getString(R.string.error_no_address);
-        }
+        if (addresses == null || addresses.isEmpty()) return getString(R.string.error_no_address);
         Address addr = addresses.get(0);
         StringBuilder sb = new StringBuilder();
         appendIfNotNull(sb, addr.getSubThoroughfare());
@@ -438,14 +443,39 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ---------------------------------------------------------------------
-    //  Actions
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    //  Actions (Share / Copy / Maps / per-card tap-to-copy)
+    // -------------------------------------------------------------------------
 
     private void wireActionButtons() {
         binding.btnShare.setOnClickListener(v -> shareCurrentLocation());
-        binding.btnCopy.setOnClickListener(v -> copyCurrentLocation());
+        binding.btnCopy.setOnClickListener(v -> copyToClipboard(getString(R.string.clipboard_label),
+                buildShareText(), R.string.clipboard_copied));
         binding.btnMaps.setOnClickListener(v -> openInMaps());
+    }
+
+    private void wireCardTapToCopy() {
+        binding.coordsCard.setOnClickListener(v -> {
+            if (lastKnown == null) return;
+            String text = String.format(Locale.US, "%.6f, %.6f",
+                    lastKnown.getLatitude(), lastKnown.getLongitude());
+            copyToClipboard("Coordinates", text, R.string.clipboard_coords_copied);
+        });
+        binding.addressCard.setOnClickListener(v -> {
+            if (lastAddress == null || lastAddress.isEmpty()) return;
+            copyToClipboard("Address", lastAddress.replace("\n", ", "),
+                    R.string.clipboard_address_copied);
+        });
+    }
+
+    private void copyToClipboard(@NonNull String label, @NonNull String text, int toastResId) {
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm == null) return;
+        cm.setPrimaryClip(ClipData.newPlainText(label, text));
+        // Android 13+ shows a system clipboard preview, so we only toast on older builds.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Toast.makeText(this, toastResId, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void shareCurrentLocation() {
@@ -461,19 +491,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void copyCurrentLocation() {
-        if (lastKnown == null) return;
-        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (cm == null) return;
-        cm.setPrimaryClip(ClipData.newPlainText(
-                getString(R.string.clipboard_label), buildShareText()));
-        // From Android 13, the system shows its own clipboard toast — so on
-        // older versions we surface our own confirmation.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Toast.makeText(this, R.string.clipboard_copied, Toast.LENGTH_SHORT).show();
-        }
-    }
-
     private void openInMaps() {
         if (lastKnown == null) return;
         String label = Uri.encode(getString(R.string.app_name));
@@ -486,7 +503,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             startActivity(intent);
         } catch (ActivityNotFoundException e) {
-            // Fall back to Google Maps web URL if no geo: handler is installed.
+            // Fall back to Google Maps web URL.
             Uri webUri = Uri.parse(String.format(Locale.US,
                     "https://www.google.com/maps/search/?api=1&query=%f,%f",
                     lastKnown.getLatitude(), lastKnown.getLongitude()));
@@ -502,10 +519,18 @@ public class MainActivity extends AppCompatActivity {
     private String buildShareText() {
         if (lastKnown == null) return "";
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format(Locale.US, "%.6f, %.6f",
-                lastKnown.getLatitude(), lastKnown.getLongitude()));
+        sb.append(getString(R.string.share_prefix)).append("\n\n");
+        sb.append(LocationFormatter.formatLatitude(lastKnown.getLatitude(), getCoordFormat()))
+                .append(", ")
+                .append(LocationFormatter.formatLongitude(lastKnown.getLongitude(), getCoordFormat()))
+                .append("\n");
+        if (lastKnown.hasAltitude()) {
+            sb.append("Altitude: ")
+                    .append(LocationFormatter.formatAltitude(lastKnown.getAltitude(), getAltitudeUnit()))
+                    .append("\n");
+        }
         if (lastAddress != null && !lastAddress.isEmpty()) {
-            sb.append("\n").append(lastAddress.replace("\n", ", "));
+            sb.append(lastAddress.replace("\n", ", ")).append("\n");
         }
         sb.append("\n").append(String.format(Locale.US,
                 "https://www.google.com/maps/search/?api=1&query=%f,%f",
@@ -513,9 +538,78 @@ public class MainActivity extends AppCompatActivity {
         return sb.toString();
     }
 
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    //  Settings (units & coord format)
+    // -------------------------------------------------------------------------
+
+    @NonNull
+    private LocationFormatter.AltitudeUnit getAltitudeUnit() {
+        return "ft".equals(prefs.getString(KEY_ALTITUDE_UNIT, "m"))
+                ? LocationFormatter.AltitudeUnit.FEET
+                : LocationFormatter.AltitudeUnit.METERS;
+    }
+
+    @NonNull
+    private LocationFormatter.CoordFormat getCoordFormat() {
+        return "dms".equals(prefs.getString(KEY_COORD_FORMAT, "decimal"))
+                ? LocationFormatter.CoordFormat.DMS
+                : LocationFormatter.CoordFormat.DECIMAL;
+    }
+
+    private void showSettingsDialog() {
+        boolean isFeet = getAltitudeUnit() == LocationFormatter.AltitudeUnit.FEET;
+        boolean isDms  = getCoordFormat()  == LocationFormatter.CoordFormat.DMS;
+
+        // Build a 4-row choice list: 2 altitude options + 2 coord options.
+        CharSequence[] items = new CharSequence[] {
+                getString(R.string.settings_altitude_meters),
+                getString(R.string.settings_altitude_feet),
+                getString(R.string.settings_coord_decimal),
+                getString(R.string.settings_coord_dms),
+        };
+        boolean[] checked = new boolean[] {
+                !isFeet, isFeet, !isDms, isDms,
+        };
+        // We want exclusive choice within each group — use two single-choice dialogs.
+        // Simpler: just use AlertDialog with single-choice for altitude first, then coord format.
+        showAltitudeChoice(isFeet);
+    }
+
+    private void showAltitudeChoice(boolean isFeetCurrent) {
+        CharSequence[] items = {
+                getString(R.string.settings_altitude_meters),
+                getString(R.string.settings_altitude_feet),
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.settings_altitude_header)
+                .setSingleChoiceItems(items, isFeetCurrent ? 1 : 0, (dialog, which) -> {
+                    prefs.edit().putString(KEY_ALTITUDE_UNIT, which == 1 ? "ft" : "m").apply();
+                    dialog.dismiss();
+                    showCoordChoice(getCoordFormat() == LocationFormatter.CoordFormat.DMS);
+                })
+                .setNegativeButton(R.string.dialog_close, null)
+                .show();
+    }
+
+    private void showCoordChoice(boolean isDmsCurrent) {
+        CharSequence[] items = {
+                getString(R.string.settings_coord_decimal),
+                getString(R.string.settings_coord_dms),
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.settings_coord_header)
+                .setSingleChoiceItems(items, isDmsCurrent ? 1 : 0, (dialog, which) -> {
+                    prefs.edit().putString(KEY_COORD_FORMAT, which == 1 ? "dms" : "decimal").apply();
+                    dialog.dismiss();
+                    refreshNow();
+                })
+                .setNegativeButton(R.string.dialog_close, null)
+                .show();
+    }
+
+    // -------------------------------------------------------------------------
     //  Menu / about
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -526,6 +620,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
+        if (id == R.id.menu_refresh) {
+            refreshNow();
+            return true;
+        }
+        if (id == R.id.menu_units) {
+            showSettingsDialog();
+            return true;
+        }
         if (id == R.id.menu_about) {
             new AlertDialog.Builder(this)
                     .setTitle(R.string.about_title)

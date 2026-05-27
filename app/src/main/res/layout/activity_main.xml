@@ -199,12 +199,16 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Address card -->
+            <!-- Address card (tap to copy) -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/addressCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:contentDescription="@string/cd_tap_to_copy"
                 app:cardBackgroundColor="@color/surfaceCard"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="4dp">
