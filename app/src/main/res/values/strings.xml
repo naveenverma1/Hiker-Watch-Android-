@@ -30,7 +30,7 @@
     <!-- Actions -->
     <string name="action_share">Share</string>
     <string name="action_copy">Copy</string>
-    <string name="action_open_in_maps">Open in Maps</string>
+    <string name="action_open_in_maps">Maps</string>
     <string name="action_retry">Retry</string>
     <string name="action_open_settings">Open Settings</string>
     <string name="action_enable_location">Enable</string>
