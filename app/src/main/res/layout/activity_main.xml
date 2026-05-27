@@ -266,6 +266,110 @@
                         android:visibility="gone"
                         tools:visibility="visible"
                         tools:text="14 in fix / 22 in view" />
+
+                    <TextView
+                        android:id="@+id/pressureText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataAccuracy"
+                        android:textSize="14sp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        tools:text="Pressure: 1013.2 hPa" />
+
+                    <TextView
+                        android:id="@+id/baroAltText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataAccuracy"
+                        android:textSize="14sp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        tools:text="Baro alt: 245 m" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Sky card: sunrise / sunset / solar noon / day length / moon
+                 phase. Hidden until we have a fix (lat/lon needed). -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/skyCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/surfaceCard"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.08"
+                        android:text="@string/header_sky"
+                        android:textColor="@color/colorPrimaryDark"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/sunriseText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataLatitude"
+                        android:textSize="16sp"
+                        tools:text="Sunrise:    06:14" />
+
+                    <TextView
+                        android:id="@+id/sunsetText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataLongitude"
+                        android:textSize="16sp"
+                        tools:text="Sunset:     20:42" />
+
+                    <TextView
+                        android:id="@+id/solarNoonText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataAltitude"
+                        android:textSize="14sp"
+                        tools:text="Solar noon: 13:28" />
+
+                    <TextView
+                        android:id="@+id/dayLengthText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataAccuracy"
+                        android:textSize="14sp"
+                        tools:text="Day length: 14h 28m" />
+
+                    <TextView
+                        android:id="@+id/moonText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="14sp"
+                        tools:text="Moon: Waxing Gibbous (78% lit)" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

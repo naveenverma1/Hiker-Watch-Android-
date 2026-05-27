@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# commons-suncalc references FindBugs annotations only at compile time. R8
+# warns about the missing annotation classes; safe to ignore.
+-dontwarn edu.umd.cs.findbugs.annotations.**
+-dontwarn javax.annotation.**

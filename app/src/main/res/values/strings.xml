@@ -103,4 +103,16 @@
     <string name="shortcut_copy_long">Copy my coords</string>
     <string name="shortcut_no_fix_yet">No location yet — open Hiker\'s Watch first</string>
     <string name="shortcut_copied">Copied: %s</string>
+
+    <!-- New in 2.5: sky (sunrise / sunset / moon) + barometer -->
+    <string name="header_sky">SKY</string>
+    <string name="sunrise_label">Sunrise:    %s</string>
+    <string name="sunset_label">Sunset:     %s</string>
+    <string name="solar_noon_label">Solar noon: %s</string>
+    <string name="day_length_label">Day length: %s</string>
+    <string name="polar_day">No sunset today (polar day)</string>
+    <string name="polar_night">No sunrise today (polar night)</string>
+    <string name="moon_label">Moon: %1$s (%2$d%% lit)</string>
+    <string name="pressure_label">Pressure: %.1f hPa</string>
+    <string name="baro_altitude_label">Baro alt: %s</string>
 </resources>

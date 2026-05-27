@@ -15,8 +15,8 @@ android {
         applicationId "com.nv.nvgeowatch"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 6
-        versionName "2.4"
+        versionCode 7
+        versionName "2.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // Only English strings are shipped — drop default-lib translations to slim the AAB.
@@ -52,6 +52,8 @@ android {
     }
 
     compileOptions {
+        // Required for commons-suncalc (uses java.time) on API < 26.
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -65,6 +67,12 @@ dependencies {
     implementation 'androidx.core:core-splashscreen:1.0.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'com.google.android.gms:play-services-location:21.1.0'
+
+    // Local astronomy (sun/moon/twilight) — Apache 2.0, ~57KB, zero transitive deps.
+    implementation 'org.shredzone.commons:commons-suncalc:3.11'
+
+    // Backport of java.time for minSdk 21 — needed by commons-suncalc.
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

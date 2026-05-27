@@ -61,6 +61,8 @@ import java.util.regex.Pattern;
  *   - {@link LocationFormatter} for unit conversions + format choice
  *   - {@link CompassController} for compass/bearing (rotation vector sensor)
  *   - {@link GnssStatusController} for satellite info
+ *   - {@link BarometerController} for barometric pressure
+ *   - {@link AstronomyController} for sunrise/sunset/moon/twilight
  *   - {@link LastKnownLocationStore} for the QS tile / app shortcut hand-off
  *
  * Inputs the activity reacts to:
@@ -68,6 +70,7 @@ import java.util.regex.Pattern;
  *   - GPS fixes from FusedLocationProvider
  *   - Compass updates from the rotation-vector sensor
  *   - GnssStatus callbacks
+ *   - Barometric pressure changes
  *   - Overflow menu (Refresh / Units & format / Privacy / About)
  *   - Action-row buttons (Share, Copy, Open in Maps)
  *   - Tap on any card -> per-card copy
@@ -99,6 +102,7 @@ public class MainActivity extends AppCompatActivity {
     private LocationCallback locationCallback;
     private CompassController compass;
     private GnssStatusController gnssStatus;
+    private BarometerController barometer;
     private SharedPreferences prefs;
     private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -149,6 +153,7 @@ public class MainActivity extends AppCompatActivity {
 
         compass = new CompassController(this);
         gnssStatus = new GnssStatusController(this);
+        barometer = new BarometerController(this);
 
         // Handle a geo:lat,lon intent that brought us here.
         handleIntent(getIntent());
@@ -176,6 +181,9 @@ public class MainActivity extends AppCompatActivity {
         if (gnssStatus != null && gnssStatus.isAvailable() && hasAnyLocationPermission()) {
             gnssStatus.start(this::onSatellitesChanged);
         }
+        if (barometer != null && barometer.isAvailable()) {
+            barometer.start(this::onPressureChanged);
+        }
     }
 
     @Override
@@ -184,6 +192,7 @@ public class MainActivity extends AppCompatActivity {
         stopLocationUpdates();
         if (compass != null) compass.stop();
         if (gnssStatus != null) gnssStatus.stop();
+        if (barometer != null) barometer.stop();
         mainHandler.removeCallbacks(fixTimeoutRunnable);
         mainHandler.removeCallbacks(geocodeTimeoutRunnable);
     }
@@ -377,6 +386,7 @@ public class MainActivity extends AppCompatActivity {
 
         updateSpeedRow(location);
         updateTargetCard();
+        updateSkyCard(location);
         refreshSensorsCardVisibility();
 
         setActionsEnabled(true);
@@ -447,8 +457,52 @@ public class MainActivity extends AppCompatActivity {
     private void refreshSensorsCardVisibility() {
         boolean any = binding.speedText.getVisibility() == View.VISIBLE
                 || binding.bearingText.getVisibility() == View.VISIBLE
-                || binding.satellitesText.getVisibility() == View.VISIBLE;
+                || binding.satellitesText.getVisibility() == View.VISIBLE
+                || binding.pressureText.getVisibility() == View.VISIBLE;
         binding.sensorsCard.setVisibility(any ? View.VISIBLE : View.GONE);
+    }
+
+    private void onPressureChanged(float hPa, float altMeters) {
+        binding.pressureText.setText(getString(R.string.pressure_label, hPa));
+        binding.pressureText.setVisibility(View.VISIBLE);
+        // Baro altitude uses the user's altitude unit preference for consistency.
+        binding.baroAltText.setText(getString(R.string.baro_altitude_label,
+                LocationFormatter.formatAltitude(altMeters, getAltitudeUnit())));
+        binding.baroAltText.setVisibility(View.VISIBLE);
+        refreshSensorsCardVisibility();
+    }
+
+    private void updateSkyCard(@NonNull Location loc) {
+        AstronomyController.Sky s = AstronomyController.compute(
+                loc.getLatitude(), loc.getLongitude());
+        binding.skyCard.setVisibility(View.VISIBLE);
+
+        if (s.alwaysUp) {
+            binding.sunriseText.setText(R.string.polar_day);
+            binding.sunsetText.setVisibility(View.GONE);
+        } else if (s.alwaysDown) {
+            binding.sunriseText.setText(R.string.polar_night);
+            binding.sunsetText.setVisibility(View.GONE);
+        } else {
+            binding.sunriseText.setText(getString(R.string.sunrise_label,
+                    s.sunriseLocal == null ? "—" : s.sunriseLocal));
+            binding.sunsetText.setText(getString(R.string.sunset_label,
+                    s.sunsetLocal == null ? "—" : s.sunsetLocal));
+            binding.sunsetText.setVisibility(View.VISIBLE);
+        }
+        binding.solarNoonText.setText(getString(R.string.solar_noon_label,
+                s.solarNoonLocal == null ? "—" : s.solarNoonLocal));
+        binding.solarNoonText.setVisibility(s.solarNoonLocal == null ? View.GONE : View.VISIBLE);
+
+        if (s.dayLength != null) {
+            binding.dayLengthText.setText(getString(R.string.day_length_label, s.dayLength));
+            binding.dayLengthText.setVisibility(View.VISIBLE);
+        } else {
+            binding.dayLengthText.setVisibility(View.GONE);
+        }
+
+        int illumPct = (int) Math.round(s.moonIllumination * 100.0);
+        binding.moonText.setText(getString(R.string.moon_label, s.moonPhaseName, illumPct));
     }
 
     // -------------------------------------------------------------------------

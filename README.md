@@ -13,6 +13,14 @@ Live on Google Play: <https://play.google.com/store/apps/details?id=com.nv.nvgeo
 
 - Real-time GPS readings (lat, lon, altitude, accuracy)
 - Reverse-geocoded street address
+- Compass with true / magnetic north toggle (rotation-vector sensor)
+- Speed and bearing readouts (auto-hide when stationary)
+- Live satellite count (in-fix / in-view)
+- Barometric pressure and altitude (devices with a barometer)
+- Sunrise, sunset, solar noon, day length, and moon phase for your position
+- Open a `geo:lat,lon` link from any app — see distance + bearing to the target
+- Quick Settings tile and home-screen shortcut to copy your coords instantly
+- Keep-screen-on toggle for trail use
 - Share / Copy / Open-in-Maps from any fix
 - Graceful recovery from denied permissions, blocked permissions, or disabled
   Location Services — no dead ends
