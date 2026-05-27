@@ -7,6 +7,14 @@
         android:title="@string/action_refresh"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/menu_save_waypoint"
+        android:title="@string/action_save_waypoint"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_waypoints"
+        android:title="@string/action_waypoints"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_units"
         android:title="@string/action_units"
         app:showAsAction="never" />

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_export_gpx"
+        android:icon="@drawable/ic_share"
+        android:title="@string/action_export_gpx"
+        android:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/menu_delete_all"
+        android:title="@string/action_delete_all"
+        android:showAsAction="never" />
+</menu>

@@ -78,6 +78,25 @@
                 android:value="false" />
         </service>
 
+        <!-- Waypoints list activity (save / rename / delete / export GPX). -->
+        <activity
+            android:name=".WaypointsActivity"
+            android:exported="false"
+            android:label="@string/waypoints_title"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/AppTheme" />
+
+        <!-- FileProvider for sharing the exported GPX file. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>

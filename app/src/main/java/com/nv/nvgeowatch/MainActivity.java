@@ -18,13 +18,17 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.text.InputType;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -113,6 +117,30 @@ public class MainActivity extends AppCompatActivity {
 
     private final Runnable fixTimeoutRunnable     = this::onFixTimeout;
     private final Runnable geocodeTimeoutRunnable = this::onGeocodeTimeout;
+
+    /**
+     * Receives the user's pick from {@link WaypointsActivity} and sets it
+     * as the current target so the existing target card lights up.
+     */
+    private final ActivityResultLauncher<Intent> waypointPickLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() != RESULT_OK || result.getData() == null) return;
+                        Intent d = result.getData();
+                        double lat = d.getDoubleExtra(WaypointsActivity.EXTRA_TARGET_LAT, Double.NaN);
+                        double lon = d.getDoubleExtra(WaypointsActivity.EXTRA_TARGET_LON, Double.NaN);
+                        String name = d.getStringExtra(WaypointsActivity.EXTRA_TARGET_NAME);
+                        if (Double.isNaN(lat) || Double.isNaN(lon)) return;
+                        Location t = new Location("waypoint");
+                        t.setLatitude(lat);
+                        t.setLongitude(lon);
+                        targetLocation = t;
+                        updateTargetCard();
+                        if (name != null) {
+                            Toast.makeText(this, getString(R.string.target_set_to, name),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
 
     // -------------------------------------------------------------------------
     //  Lifecycle
@@ -840,6 +868,14 @@ public class MainActivity extends AppCompatActivity {
             showSettingsDialog();
             return true;
         }
+        if (id == R.id.menu_save_waypoint) {
+            promptSaveWaypoint();
+            return true;
+        }
+        if (id == R.id.menu_waypoints) {
+            waypointPickLauncher.launch(WaypointsActivity.newIntent(this));
+            return true;
+        }
         if (id == R.id.menu_about) {
             new AlertDialog.Builder(this)
                     .setTitle(R.string.about_title)
@@ -865,5 +901,50 @@ public class MainActivity extends AppCompatActivity {
     private void renderVersionFooter() {
         binding.versionFooter.setText(getString(R.string.footer_version,
                 BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
+    }
+
+    // -------------------------------------------------------------------------
+    //  Waypoints (save current fix → SharedPreferences)
+    // -------------------------------------------------------------------------
+
+    private void promptSaveWaypoint() {
+        if (lastKnown == null) {
+            Toast.makeText(this, R.string.waypoint_no_fix, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        input.setHint(R.string.waypoint_name_hint);
+        // Pre-fill with a sensible default the user can clear quickly.
+        String def = lastAddress != null && !lastAddress.isEmpty()
+                ? lastAddress.split("\\n")[0]
+                : getString(R.string.waypoint_default_name,
+                        java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT)
+                                .format(new java.util.Date()));
+        input.setText(def);
+        input.setSelectAllOnFocus(true);
+
+        final Location fix = lastKnown;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.action_save_waypoint)
+                .setView(input)
+                .setPositiveButton(R.string.dialog_save, (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) name = def;
+                    long now = System.currentTimeMillis();
+                    Waypoint wp = new Waypoint(now, name,
+                            fix.getLatitude(), fix.getLongitude(),
+                            fix.hasAltitude() ? fix.getAltitude() : Double.NaN,
+                            now);
+                    String err = WaypointStore.add(this, wp);
+                    if (err != null) {
+                        Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(this, getString(R.string.waypoint_saved, name),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(R.string.dialog_close, null)
+                .show();
     }
 }

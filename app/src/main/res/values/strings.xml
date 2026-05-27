@@ -115,4 +115,28 @@
     <string name="moon_label">Moon: %1$s (%2$d%% lit)</string>
     <string name="pressure_label">Pressure: %.1f hPa</string>
     <string name="baro_altitude_label">Baro alt: %s</string>
+
+    <!-- New in 2.6: waypoints + GPX export -->
+    <string name="action_save_waypoint">Save waypoint</string>
+    <string name="action_waypoints">Waypoints</string>
+    <string name="action_export_gpx">Export GPX</string>
+    <string name="action_set_as_target">Set as target</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_delete_all">Delete all</string>
+    <string name="waypoints_title">Waypoints</string>
+    <string name="waypoints_empty">No waypoints yet. Use the menu \u2192 \"Save waypoint\" to add one.</string>
+    <string name="waypoint_saved_at_label">Saved %s</string>
+    <string name="waypoint_default_name">Waypoint %s</string>
+    <string name="waypoint_name_hint">Name (e.g. Trail head, Car, Camp)</string>
+    <string name="waypoint_saved">Saved \"%s\"</string>
+    <string name="waypoint_no_fix">No location fix yet — wait for a fix first.</string>
+    <string name="confirm_delete_title">Delete waypoint?</string>
+    <string name="confirm_delete_message">Delete \"%s\" permanently?</string>
+    <string name="confirm_delete_all_title">Delete all waypoints?</string>
+    <string name="confirm_delete_all_message">This cannot be undone.</string>
+    <string name="gpx_share_subject">Hiker\'s Watch waypoints</string>
+    <string name="gpx_share_chooser">Save / share GPX</string>
+    <string name="error_gpx_write">Could not write GPX file to cache.</string>
+    <string name="target_set_to">Target set to \"%s\"</string>
 </resources>
