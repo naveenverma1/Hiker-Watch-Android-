@@ -22,6 +22,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -50,48 +51,61 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Hiker's Watch — single-screen GPS display.
  *
- * Lifecycle
- *   - onCreate: install splash, inflate view, wire toolbar/actions, ask for permission.
- *   - onResume: re-evaluate state (permission / GPS / coarse-only), start updates.
- *   - onPause:  stop location updates and cancel pending tasks.
+ * Composition (each is one focused class — see the file in the same package):
+ *   - {@link LocationFormatter} for unit conversions + format choice
+ *   - {@link CompassController} for compass/bearing (rotation vector sensor)
+ *   - {@link GnssStatusController} for satellite info
+ *   - {@link LastKnownLocationStore} for the QS tile / app shortcut hand-off
  *
- * Edge-to-edge for Android 15 (API 35) via setDecorFitsSystemWindows(false) +
- * inset-aware padding on the app bar and scroll view.
- *
- * User preferences (altitude unit, coordinate format) live in SharedPreferences
- * so they survive process restarts. Defaults: meters + decimal degrees.
+ * Inputs the activity reacts to:
+ *   - User permission grants / location-services toggles
+ *   - GPS fixes from FusedLocationProvider
+ *   - Compass updates from the rotation-vector sensor
+ *   - GnssStatus callbacks
+ *   - Overflow menu (Refresh / Units & format / Privacy / About)
+ *   - Action-row buttons (Share, Copy, Open in Maps)
+ *   - Tap on any card -> per-card copy
+ *   - An incoming geo: intent (sets a "target", shows distance + bearing to it)
  */
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "HikerWatch";
     private static final int LOCATION_PERMISSION_REQUEST = 1;
 
-    private static final long LOCATION_UPDATE_INTERVAL_MS = 5_000L;
+    private static final long LOCATION_UPDATE_INTERVAL_MS  = 5_000L;
     private static final long LOCATION_FASTEST_INTERVAL_MS = 2_000L;
-    /** If we don't have a fix this long after starting, surface a hint to the user. */
-    private static final long FIX_TIMEOUT_MS    = 30_000L;
-    /** If the geocoder hasn't returned after this long, surface a hint to the user. */
-    private static final long GEOCODE_TIMEOUT_MS = 10_000L;
+    private static final long FIX_TIMEOUT_MS               = 30_000L;
+    private static final long GEOCODE_TIMEOUT_MS           = 10_000L;
+    /** Below this speed we suppress the speed row to avoid noisy near-zero values. */
+    private static final float MIN_SPEED_TO_SHOW_MPS       = 0.5f;
 
     // SharedPreferences keys
     private static final String PREFS = "hiker_prefs";
     private static final String KEY_HAS_REQUESTED_PERMISSION = "has_requested_permission";
     private static final String KEY_ALTITUDE_UNIT = "altitude_unit";   // "m" | "ft"
     private static final String KEY_COORD_FORMAT  = "coord_format";    // "decimal" | "dms"
+    private static final String KEY_SPEED_UNIT    = "speed_unit";      // "kmh" | "mph"
+    private static final String KEY_TRUE_NORTH    = "true_north";      // bool
+    private static final String KEY_KEEP_SCREEN_ON = "keep_screen_on"; // bool
 
     private ActivityMainBinding binding;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
+    private CompassController compass;
+    private GnssStatusController gnssStatus;
     private SharedPreferences prefs;
     private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Nullable private Location lastKnown;
     @Nullable private String   lastAddress;
+    @Nullable private Location targetLocation;  // set when launched via geo: intent
 
     private final Runnable fixTimeoutRunnable     = this::onFixTimeout;
     private final Runnable geocodeTimeoutRunnable = this::onGeocodeTimeout;
@@ -111,6 +125,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        applyKeepScreenOnPref();
 
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
@@ -132,7 +147,20 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
+        compass = new CompassController(this);
+        gnssStatus = new GnssStatusController(this);
+
+        // Handle a geo:lat,lon intent that brought us here.
+        handleIntent(getIntent());
+
         ensurePermissionAndStart();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
     }
 
     @Override
@@ -142,12 +170,20 @@ public class MainActivity extends AppCompatActivity {
         if (hasAnyLocationPermission() && isLocationEnabled()) {
             startLocationUpdates();
         }
+        if (compass != null && compass.isAvailable()) {
+            compass.start(this::onBearingChanged);
+        }
+        if (gnssStatus != null && gnssStatus.isAvailable() && hasAnyLocationPermission()) {
+            gnssStatus.start(this::onSatellitesChanged);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         stopLocationUpdates();
+        if (compass != null) compass.stop();
+        if (gnssStatus != null) gnssStatus.stop();
         mainHandler.removeCallbacks(fixTimeoutRunnable);
         mainHandler.removeCallbacks(geocodeTimeoutRunnable);
     }
@@ -176,6 +212,14 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void applyKeepScreenOnPref() {
+        if (prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
     // -------------------------------------------------------------------------
     //  Permission flow (with first-run-aware UX)
     // -------------------------------------------------------------------------
@@ -195,8 +239,6 @@ public class MainActivity extends AppCompatActivity {
         if (hasAnyLocationPermission()) {
             startLocationUpdates();
         } else {
-            // Mark that we've now requested at least once so onResume distinguishes
-            // "never asked" from "denied permanently" reliably.
             prefs.edit().putBoolean(KEY_HAS_REQUESTED_PERMISSION, true).apply();
             ActivityCompat.requestPermissions(this,
                     new String[]{
@@ -212,7 +254,12 @@ public class MainActivity extends AppCompatActivity {
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != LOCATION_PERMISSION_REQUEST) return;
-        if (hasAnyLocationPermission()) startLocationUpdates();
+        if (hasAnyLocationPermission()) {
+            startLocationUpdates();
+            if (gnssStatus != null && gnssStatus.isAvailable()) {
+                gnssStatus.start(this::onSatellitesChanged);
+            }
+        }
         refreshWarningBanner();
     }
 
@@ -221,20 +268,12 @@ public class MainActivity extends AppCompatActivity {
         return lm != null && LocationManagerCompat.isLocationEnabled(lm);
     }
 
-    /**
-     * Decide which warning banner (if any) to surface based on current state.
-     * Critical: distinguish "never asked" from "permanently denied" via the
-     * {@link #KEY_HAS_REQUESTED_PERMISSION} flag — they look identical from
-     * {@link ActivityCompat#shouldShowRequestPermissionRationale}.
-     */
     private void refreshWarningBanner() {
         if (!hasAnyLocationPermission()) {
             boolean hasAskedBefore = prefs.getBoolean(KEY_HAS_REQUESTED_PERMISSION, false);
             boolean canAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(
                     this, Manifest.permission.ACCESS_FINE_LOCATION);
             if (!hasAskedBefore) {
-                // Truly first run — the system dialog will appear momentarily.
-                // Don't scare the user with "blocked"; show a gentle inline note.
                 showWarning(getString(R.string.error_permission_first_run),
                         getString(R.string.action_grant), this::ensurePermissionAndStart);
             } else if (canAskAgain) {
@@ -325,6 +364,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void onLocationFix(@NonNull Location location) {
         lastKnown = location;
+        LastKnownLocationStore.save(this, location);  // for tile + shortcut
+        if (compass != null) compass.updateLocation(location);
+
         showLoading(false);
         mainHandler.removeCallbacks(fixTimeoutRunnable);
 
@@ -333,13 +375,15 @@ public class MainActivity extends AppCompatActivity {
         binding.alt.setText("Altitude:  " + LocationFormatter.formatAltitude(location.getAltitude(), getAltitudeUnit()));
         binding.acc.setText(String.format(Locale.US, "Accuracy:  %.1f m", location.getAccuracy()));
 
+        updateSpeedRow(location);
+        updateTargetCard();
+        refreshSensorsCardVisibility();
+
         setActionsEnabled(true);
         resolveAddress(location.getLatitude(), location.getLongitude());
     }
 
-    private void onFixTimeout() {
-        refreshWarningBanner();
-    }
+    private void onFixTimeout() { refreshWarningBanner(); }
 
     private void onGeocodeTimeout() {
         if (lastAddress == null) binding.address.setText(R.string.error_geocoder_timeout);
@@ -356,12 +400,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshNow() {
-        // Re-render with the current fix (picks up new units / format) and re-fetch the geocode.
         lastAddress = null;
-        if (lastKnown != null) {
-            onLocationFix(lastKnown);
-        }
-        // Force a fresh location pull from the fused client.
+        if (lastKnown != null) onLocationFix(lastKnown);
         try {
             fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
                 if (location != null) onLocationFix(location);
@@ -370,7 +410,111 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // -------------------------------------------------------------------------
-    //  Reverse geocoding (with timeout)
+    //  Compass + speed + satellites
+    // -------------------------------------------------------------------------
+
+    private void onBearingChanged(float magneticDeg, float trueDeg, int accuracy) {
+        boolean useTrue = prefs.getBoolean(KEY_TRUE_NORTH, true);
+        float deg = useTrue ? trueDeg : magneticDeg;
+        int degInt = Math.round(deg);
+        String card = CompassController.cardinal(deg);
+        binding.bearingText.setText(getString(R.string.bearing_format, degInt, card));
+        binding.bearingText.setVisibility(View.VISIBLE);
+        refreshSensorsCardVisibility();
+
+        // Update bearing-to-target if we have one.
+        updateTargetBearingRowOnly();
+    }
+
+    private void onSatellitesChanged(int total, int used) {
+        binding.satellitesText.setText(getString(R.string.satellites_format, used, total));
+        binding.satellitesText.setVisibility(View.VISIBLE);
+        refreshSensorsCardVisibility();
+    }
+
+    private void updateSpeedRow(Location location) {
+        if (!location.hasSpeed() || location.getSpeed() < MIN_SPEED_TO_SHOW_MPS) {
+            binding.speedText.setVisibility(View.GONE);
+            return;
+        }
+        boolean mph = "mph".equals(prefs.getString(KEY_SPEED_UNIT, "kmh"));
+        float speed = mph ? location.getSpeed() * 2.23694f : location.getSpeed() * 3.6f;
+        binding.speedText.setText(getString(
+                mph ? R.string.speed_mph : R.string.speed_kmh, speed));
+        binding.speedText.setVisibility(View.VISIBLE);
+    }
+
+    private void refreshSensorsCardVisibility() {
+        boolean any = binding.speedText.getVisibility() == View.VISIBLE
+                || binding.bearingText.getVisibility() == View.VISIBLE
+                || binding.satellitesText.getVisibility() == View.VISIBLE;
+        binding.sensorsCard.setVisibility(any ? View.VISIBLE : View.GONE);
+    }
+
+    // -------------------------------------------------------------------------
+    //  geo: intent receive → target card
+    // -------------------------------------------------------------------------
+
+    private static final Pattern GEO_PATTERN = Pattern.compile(
+            "^geo:(-?\\d+(?:\\.\\d+)?),(-?\\d+(?:\\.\\d+)?)");
+
+    private void handleIntent(@Nullable Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+        if (!Intent.ACTION_VIEW.equals(intent.getAction())) return;
+        Uri uri = intent.getData();
+        if (uri == null || !"geo".equalsIgnoreCase(uri.getScheme())) return;
+        Matcher m = GEO_PATTERN.matcher(uri.toString());
+        if (!m.find()) return;
+        try {
+            double lat = Double.parseDouble(m.group(1));
+            double lon = Double.parseDouble(m.group(2));
+            Location t = new Location("intent");
+            t.setLatitude(lat);
+            t.setLongitude(lon);
+            targetLocation = t;
+            updateTargetCard();
+        } catch (NumberFormatException ignore) {}
+    }
+
+    private void updateTargetCard() {
+        if (targetLocation == null) {
+            binding.targetCard.setVisibility(View.GONE);
+            return;
+        }
+        binding.targetCard.setVisibility(View.VISIBLE);
+        binding.targetCoords.setText(String.format(Locale.US, "%.6f°, %.6f°",
+                targetLocation.getLatitude(), targetLocation.getLongitude()));
+        if (lastKnown == null) {
+            binding.targetDistance.setText(getString(R.string.distance_to_target, "—"));
+            binding.targetBearing.setText(getString(R.string.bearing_to_target, 0, "—"));
+            return;
+        }
+        float distMeters = lastKnown.distanceTo(targetLocation);
+        binding.targetDistance.setText(getString(R.string.distance_to_target,
+                formatDistance(distMeters)));
+        float bearingDeg = lastKnown.bearingTo(targetLocation);
+        if (bearingDeg < 0) bearingDeg += 360f;
+        int b = Math.round(bearingDeg);
+        binding.targetBearing.setText(getString(R.string.bearing_to_target,
+                b, CompassController.cardinal(bearingDeg)));
+    }
+
+    /** Updates only the bearing row (called on every compass tick, cheap). */
+    private void updateTargetBearingRowOnly() {
+        if (targetLocation == null || lastKnown == null) return;
+        // Bearing-to-target is purely from latitude/longitude — independent of
+        // device heading. So we don't actually need to do anything here right
+        // now, but if we later add a "compass arrow pointing at target", this
+        // is where we'd subtract bearing-to-target from current heading.
+    }
+
+    private static String formatDistance(float meters) {
+        if (meters < 1_000f) return String.format(Locale.US, "%.0f m", meters);
+        return String.format(Locale.US, "%.2f km", meters / 1_000f);
+    }
+
+    // -------------------------------------------------------------------------
+    //  Reverse geocoding
     // -------------------------------------------------------------------------
 
     private void resolveAddress(double latitude, double longitude) {
@@ -472,7 +616,6 @@ public class MainActivity extends AppCompatActivity {
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm == null) return;
         cm.setPrimaryClip(ClipData.newPlainText(label, text));
-        // Android 13+ shows a system clipboard preview, so we only toast on older builds.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             Toast.makeText(this, toastResId, Toast.LENGTH_SHORT).show();
         }
@@ -503,7 +646,6 @@ public class MainActivity extends AppCompatActivity {
         try {
             startActivity(intent);
         } catch (ActivityNotFoundException e) {
-            // Fall back to Google Maps web URL.
             Uri webUri = Uri.parse(String.format(Locale.US,
                     "https://www.google.com/maps/search/?api=1&query=%f,%f",
                     lastKnown.getLatitude(), lastKnown.getLongitude()));
@@ -539,7 +681,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // -------------------------------------------------------------------------
-    //  Settings (units & coord format)
+    //  Settings (units, format, true north, keep screen on)
     // -------------------------------------------------------------------------
 
     @NonNull
@@ -558,20 +700,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void showSettingsDialog() {
         boolean isFeet = getAltitudeUnit() == LocationFormatter.AltitudeUnit.FEET;
-        boolean isDms  = getCoordFormat()  == LocationFormatter.CoordFormat.DMS;
-
-        // Build a 4-row choice list: 2 altitude options + 2 coord options.
-        CharSequence[] items = new CharSequence[] {
-                getString(R.string.settings_altitude_meters),
-                getString(R.string.settings_altitude_feet),
-                getString(R.string.settings_coord_decimal),
-                getString(R.string.settings_coord_dms),
-        };
-        boolean[] checked = new boolean[] {
-                !isFeet, isFeet, !isDms, isDms,
-        };
-        // We want exclusive choice within each group — use two single-choice dialogs.
-        // Simpler: just use AlertDialog with single-choice for altitude first, then coord format.
         showAltitudeChoice(isFeet);
     }
 
@@ -601,8 +729,38 @@ public class MainActivity extends AppCompatActivity {
                 .setSingleChoiceItems(items, isDmsCurrent ? 1 : 0, (dialog, which) -> {
                     prefs.edit().putString(KEY_COORD_FORMAT, which == 1 ? "dms" : "decimal").apply();
                     dialog.dismiss();
-                    refreshNow();
+                    showNorthChoice(prefs.getBoolean(KEY_TRUE_NORTH, true));
                 })
+                .setNegativeButton(R.string.dialog_close, null)
+                .show();
+    }
+
+    private void showNorthChoice(boolean trueNorthCurrent) {
+        CharSequence[] items = {
+                getString(R.string.true_north_label),
+                getString(R.string.magnetic_north_label),
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.settings_north_reference)
+                .setSingleChoiceItems(items, trueNorthCurrent ? 0 : 1, (dialog, which) -> {
+                    prefs.edit().putBoolean(KEY_TRUE_NORTH, which == 0).apply();
+                    dialog.dismiss();
+                    showKeepScreenOnChoice(prefs.getBoolean(KEY_KEEP_SCREEN_ON, false));
+                })
+                .setNegativeButton(R.string.dialog_close, null)
+                .show();
+    }
+
+    private void showKeepScreenOnChoice(boolean keepScreenOnCurrent) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.settings_keep_screen_on)
+                .setSingleChoiceItems(new CharSequence[]{"On", "Off"},
+                        keepScreenOnCurrent ? 0 : 1, (dialog, which) -> {
+                            prefs.edit().putBoolean(KEY_KEEP_SCREEN_ON, which == 0).apply();
+                            applyKeepScreenOnPref();
+                            dialog.dismiss();
+                            refreshNow();  // pick up unit / format changes on screen
+                        })
                 .setNegativeButton(R.string.dialog_close, null)
                 .show();
     }

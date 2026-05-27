@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Static app shortcut: long-press the launcher icon → "Copy my coords"
+   fires CopyLocationShortcutActivity, which reads the last-known location
+   from SharedPreferences and copies it to the clipboard in <100ms.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="copy_coords"
+        android:enabled="true"
+        android:icon="@drawable/ic_copy"
+        android:shortcutShortLabel="@string/shortcut_copy_short"
+        android:shortcutLongLabel="@string/shortcut_copy_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.nv.nvgeowatch"
+            android:targetClass="com.nv.nvgeowatch.CopyLocationShortcutActivity" />
+    </shortcut>
+</shortcuts>

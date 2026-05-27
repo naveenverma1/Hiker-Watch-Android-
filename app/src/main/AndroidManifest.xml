@@ -6,7 +6,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- We launch Google Maps via an http(s) intent; declare visibility for Android 11+ -->
+    <!-- Optional sensors. The app degrades gracefully on devices that lack them. -->
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.barometer" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -29,6 +33,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:targetApi="33">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -37,7 +42,42 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- App-shortcut + tile + widget metadata pointer. -->
+            <meta-data android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
+            <!-- Receive geo:lat,lon links from any app and open in Hiker's Watch. -->
+            <intent-filter android:label="@string/app_name">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="geo" />
+            </intent-filter>
         </activity>
+
+        <!-- Static app shortcut target — no UI, copies coords and finishes. -->
+        <activity
+            android:name=".CopyLocationShortcutActivity"
+            android:exported="true"
+            android:label="@string/shortcut_copy_long"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
+        <!-- Quick Settings tile: pull down shade -> tap -> coords on clipboard. -->
+        <service
+            android:name=".LocationCopyTileService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@drawable/ic_my_location"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+        </service>
+
     </application>
 
 </manifest>

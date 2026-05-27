@@ -199,6 +199,76 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
+            <!-- Sensors card: speed / bearing / satellites. All rows auto-hide
+                 when there is no signal (e.g. stationary user, no compass
+                 sensor, pre-API-24 device). -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/sensorsCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/surfaceCard"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.08"
+                        android:text="@string/header_motion"
+                        android:textColor="@color/colorPrimaryDark"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/speedText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataAccuracy"
+                        android:textSize="16sp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        tools:text="Speed: 12.3 km/h" />
+
+                    <TextView
+                        android:id="@+id/bearingText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataAltitude"
+                        android:textSize="16sp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        tools:text="Bearing: 145° SE" />
+
+                    <TextView
+                        android:id="@+id/satellitesText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:drawableStart="@drawable/ic_satellite"
+                        android:drawablePadding="8dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="14sp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        tools:text="14 in fix / 22 in view" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
             <!-- Address card (tap to copy) -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/addressCard"
@@ -238,6 +308,67 @@
                         android:textColor="@color/textPrimary"
                         android:textIsSelectable="true"
                         android:textSize="15sp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Target card: shown only when the user opened a geo:lat,lon
+                 link from another app. Shows distance + bearing to that
+                 target, recomputed as the user moves. -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/targetCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/surfaceCard"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.08"
+                        android:text="@string/header_target"
+                        android:textColor="@color/colorPrimaryDark"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/targetCoords"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/textPrimary"
+                        android:textSize="15sp"
+                        tools:text="12.971600°, 77.594600°" />
+
+                    <TextView
+                        android:id="@+id/targetDistance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataLatitude"
+                        android:textSize="16sp"
+                        tools:text="Distance: 4.2 km" />
+
+                    <TextView
+                        android:id="@+id/targetBearing"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/dataAltitude"
+                        android:textSize="16sp"
+                        tools:text="Bearing to target: 145° SE" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

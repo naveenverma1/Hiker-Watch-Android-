@@ -72,4 +72,35 @@
     <string name="cd_loading">Loading location</string>
     <string name="cd_refresh">Refresh location</string>
     <string name="cd_tap_to_copy">Tap to copy</string>
+    <string name="cd_compass_dial">Compass dial</string>
+
+    <!-- New in 2.4: compass / speed / satellites / target -->
+    <string name="header_motion">MOTION</string>
+    <string name="header_compass">COMPASS</string>
+    <string name="header_satellites">SATELLITES</string>
+    <string name="header_target">TARGET</string>
+    <string name="speed_kmh">Speed:     %.1f km/h</string>
+    <string name="speed_mph">Speed:     %.1f mph</string>
+    <string name="bearing_format">Bearing:   %1$d° %2$s</string>
+    <string name="heading_format">Heading:   %1$d° %2$s</string>
+    <string name="true_north_label">True north</string>
+    <string name="magnetic_north_label">Magnetic north</string>
+    <string name="satellites_format">%1$d in fix / %2$d in view</string>
+    <string name="satellites_unavailable">Satellite info needs Android 7+</string>
+    <string name="distance_to_target">Distance: %s</string>
+    <string name="bearing_to_target">Bearing to target: %1$d° %2$s</string>
+
+    <!-- Settings dialog additions -->
+    <string name="settings_keep_screen_on">Keep screen on</string>
+    <string name="settings_north_reference">North reference</string>
+
+    <!-- Quick Settings tile -->
+    <string name="tile_no_fix_yet">No fix yet — open the app once</string>
+    <string name="tile_copied">Copied: %s</string>
+
+    <!-- App shortcut -->
+    <string name="shortcut_copy_short">Copy coords</string>
+    <string name="shortcut_copy_long">Copy my coords</string>
+    <string name="shortcut_no_fix_yet">No location yet — open Hiker\'s Watch first</string>
+    <string name="shortcut_copied">Copied: %s</string>
 </resources>

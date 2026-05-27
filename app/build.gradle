@@ -15,8 +15,8 @@ android {
         applicationId "com.nv.nvgeowatch"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 5
-        versionName "2.3"
+        versionCode 6
+        versionName "2.4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // Only English strings are shipped — drop default-lib translations to slim the AAB.
