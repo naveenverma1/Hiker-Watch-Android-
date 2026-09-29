@@ -9,12 +9,14 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace "com.nv.nvgeowatch"
-    compileSdkVersion 35
+    // Play requires updates to target API 36 (Android 16) from 31 Aug 2026.
+    // AGP 8.7.3 only knows up to 35; see android.suppressUnsupportedCompileSdk.
+    compileSdkVersion 36
 
     defaultConfig {
         applicationId "com.nv.nvgeowatch"
         minSdkVersion 21
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionCode 8
         versionName "2.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

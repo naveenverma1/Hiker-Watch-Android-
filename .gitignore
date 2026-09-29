@@ -24,3 +24,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+
+# Corporate proxy CA bundle for play_deploy.py --ca-bundle
+/keystore/corp-ca-bundle.pem
+/scripts/__pycache__/
